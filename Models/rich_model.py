@@ -39,7 +39,7 @@ def getDer(data, period):
 def generate_tickers(ticker_names):
     tickers = []
     for i in range(len(ticker_names)):
-        ticker = yf.Ticker(ticker_names[i])
+        ticker = yf.Ticker(ticker_names.iloc[0]['Symbol'])
         hist = ticker.history(start=start, end=end)
         # Todo:
         # get more info about the company such as industry
@@ -61,12 +61,16 @@ def generate_tickers(ticker_names):
 
 def main():
     # grab the stock name list
-    ticker_names = [] # some method to generate the list
-    # for temp use
-    ticker_names.append("X")
+    ticker_files = pd.read_csv("../pre_loaded_files/tickers.csv")
+
+    # for test use
+    # todo: change to a whole list
+    ticker_files = ticker_files.head()
     
     # iterate the names to get all tickers info
-    tickers = generate_tickers(ticker_names)
+    tickers = generate_tickers(ticker_files)
+    for i in range(len(ticker_files)):
+        tickers[i].to_excel("../tickers_info_output/" + ticker_files.loc[i][0] + ".xlsx")
 
 if __name__ == "__main__":
     # execute only if run as a script
