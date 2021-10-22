@@ -1,8 +1,9 @@
 import pandas as pd
 import yfinance as yf
 import numpy as np
+from strategies import *
 
-start = "2019-01-01"
+start = "2020-01-01"
 end = "2021-01-01"
 short_term = 3
 long_term_one = 30
@@ -12,29 +13,34 @@ default_nan = np.nan
 day = 1
 week = 5
 month = 20
+win_ratio = 1.05
+loss_ratio = 0.95
+
 
 def getMovingAve(data, period):
     rtn = []
-    for i in range(0, len(data)):
+    for i in range(len(data)):
         if i < period - 1:
             rtn.append(default_nan)
         else:
-            sum = 0.0
+            total = 0.0
             for j in range(i - period + 1, i + 1):
-                sum += data[j]
-            rtn.append(sum/period)
+                total += data[j]
+            rtn.append(total / period)
     return rtn
+
 
 def getDer(data, period):
     rtn = []
-    for i in range(0, len(data)):
+    for i in range(len(data)):
         if i < period:
             rtn.append(default_nan)
-        elif not np.isnan(data[i]) and not np.isnan(data[i - period]) : 
-            rtn.append((data[i] - data[i - period])/period)
+        elif not np.isnan(data[i]) and not np.isnan(data[i - period]):
+            rtn.append((data[i] - data[i - period]) / period)
         else:
             rtn.append(default_nan)
     return rtn
+
 
 def generate_tickers(ticker_names):
     tickers = []
@@ -56,8 +62,12 @@ def generate_tickers(ticker_names):
         hist['Der weekly Long 1'] = getDer(hist['Ave Long 1'], week)
         hist['Der weekly Long 2'] = getDer(hist['Ave Long 2'], week)
         hist['Der weekly Long 3'] = getDer(hist['Ave Long 3'], week)
+        hist = hist.dropna()
+        hist['Long Signal'] = longSignal(hist)
+        hist['Long Period'] = longPeriod(hist, win_ratio, loss_ratio)
         tickers.append(hist)
     return tickers
+
 
 def main():
     # grab the stock name list
@@ -65,12 +75,16 @@ def main():
 
     # for test use
     # todo: change to a whole list
-    ticker_files = ticker_files.head()
-    
+    ticker_files = ticker_files.head(1)
+
+    # WARNING:
+    #   DIDNT CHECK THE LENGTH
     # iterate the names to get all tickers info
     tickers = generate_tickers(ticker_files)
     for i in range(len(ticker_files)):
         tickers[i].to_excel("../tickers_info_output/" + ticker_files.loc[i][0] + ".xlsx")
+        print(tickers[i])
+
 
 if __name__ == "__main__":
     # execute only if run as a script
