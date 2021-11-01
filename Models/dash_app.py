@@ -1,18 +1,19 @@
 from datetime import *
 from dash import *
+from rich_model import *
 
 app = dash.Dash(__name__)
 
 app.layout = html.Div([
-    html.H1("Rich Zhang, Minglun & Yajie"),
+    html.H2("Rich Zhang, Minglun & Yajie"),
     html.Div([
         html.P("Ticker Data Range"),
         dcc.DatePickerRange(
             id='date_ranger',
-            min_date_allowed=date(2008, 1, 1),
+            min_date_allowed=date(2019, 1, 1),
             max_date_allowed=date(2021, 1, 1),
             # initial_visible_month=date(2021, 1, 1),
-            start_date=date(2019, 1, 1),
+            start_date=date(2018, 1, 1),
             end_date=date(2021, 1, 1)
         )
     ],
@@ -34,13 +35,17 @@ app.layout = html.Div([
     html.Div(html.Button('Run', id='submit-button', n_clicks=0)),
     html.Br(),
     html.Div([
-        html.H2("Return Table"),
-        dash_table.DataTable(
-            id='table',
-            columns=[{"name": i, "id": i} for i in []],
-        )
+        html.P("Return Table"),
+        dash_table.DataTable(id='report')
     ]),
 ])
+
+
+def showReport(n_clicks, start, end, strategy):
+    report = pd.DataFrame(None, columns = ['Industry', 'Count', 'Win', 'Sum Period'])
+    tickers = getTickers()
+    for i in range(len(tickers)):
+
 
 if __name__ == '__main__':
     app.run_server(debug=True)

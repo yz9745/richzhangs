@@ -2,8 +2,9 @@ import pandas as pd
 import yfinance as yf
 import numpy as np
 from strategies import *
+import time
 
-start = "2020-01-01"
+start = "2018-01-01"
 end = "2021-01-01"
 short_term = 3
 long_term_one = 30
@@ -65,25 +66,32 @@ def generate_tickers(ticker_names):
         hist = hist.dropna()
         hist['Long Signal'] = longSignal(hist)
         hist['Long Period'] = longPeriod(hist, win_ratio, loss_ratio)
+        hist['Short Signal'] = shortSignal(hist)
+        hist['Short Period'] = shortPeriod(hist, win_ratio, loss_ratio)
         tickers.append(hist)
     return tickers
 
 
-def main():
-    # grab the stock name list
+def getTickers():
     ticker_files = pd.read_csv("../pre_loaded_files/tickers.csv")
-
     # for test use
     # todo: change to a whole list
-    ticker_files = ticker_files.head(1)
+    ticker_files = ticker_files.loc[0:50]
+    return ticker_files
+
+def main():
+    # grab the stock name list
+    startT = time.time()
+    ticker_files = getTickers()
 
     # WARNING:
     #   DIDNT CHECK THE LENGTH
     # iterate the names to get all tickers info
     tickers = generate_tickers(ticker_files)
     for i in range(len(ticker_files)):
-        tickers[i].to_excel("../tickers_info_output/" + ticker_files.loc[i][0] + ".xlsx")
-        print(tickers[i])
+        tickers[i].to_csv("../tickers_info_output/" + ticker_files.loc[i][0] + ".csv")
+    endT = time.time()
+    print(f"Runtime of the program is {endT - startT}")
 
 
 if __name__ == "__main__":
