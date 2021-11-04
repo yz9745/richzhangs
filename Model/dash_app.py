@@ -1,6 +1,7 @@
 from datetime import *
 from dash import *
 from rich_model import *
+from dateutil import parser
 
 app = dash.Dash(__name__)
 
@@ -52,9 +53,14 @@ app.layout = html.Div([
 )
 def showReport(n_clicks, start, end, strategy):
     report = pd.DataFrame(None, columns=['Industry', 'Count', 'Win', 'Sum Period', 'Sum Company'])
+    start_time = int(parser.parse(start).timestamp())
+    end_time = int(parser.parse(end).timestamp())
     tickers = getTickers()
     for i in range(len(tickers)):
         ticker_info = pd.read_csv("../stradegy_output/" + tickers.loc[i]['Symbol'] + ".csv")
+        ticker_info = ticker_info.drop(ticker_info[ticker_info['Time'] < start_time].index)
+        ticker_info = ticker_info.drop(ticker_info[ticker_info['Time'] > end_time].index)
+        ticker_info = ticker_info.reset_index(drop=True)
         industry = tickers.loc[i]['Industry']
         if not industry in report['Industry']:
             report.loc[len(report.index)] = [industry, 0, 0, 0, 0]
