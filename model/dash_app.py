@@ -1,15 +1,15 @@
 from datetime import *
 from dash import *
 from rich_model import *
-from dateutil import parser
+import datetime as dt
 
 app = dash.Dash(__name__)
 
 app.layout = html.Div([
     html.H2("Rich Zhang, Minglun & Yajie"),
-    html.P("This is a backtested model to test our stradegies. You can choose the start and end dates of the stradegies and choose one of the stradegies to see the out come"),
+    html.P("This is a stock strategy analysis model that backtests effectiveness of the chosen strategy. "),
     html.Div([
-        html.P("Ticker Data Range"),
+        html.P("You can choose the date range to show the analysis results in a range"),
         dcc.DatePickerRange(
             id='date_ranger',
             min_date_allowed=date(2019, 1, 1),
@@ -23,7 +23,7 @@ app.layout = html.Div([
     ),
     html.Br(),
     html.Div([
-        html.P("Choose the Strategy"),
+        html.P("You can either choose buy strategy or sell strategy"),
         dcc.Dropdown(
             id='strategy',
             options=[
@@ -37,12 +37,17 @@ app.layout = html.Div([
     html.Div(html.Button('Run', id='submit-button', n_clicks=0)),
     html.Br(),
     html.Div([
-        html.P("Return Table"),
+        html.P("Return Table: this table shows the statistical results grouped by each industry. Win ratio represents the win rate of the chosen strategy to each industry. Average return period represents the in average how long will this stradegy bring 5% return to you"),
         dash_table.DataTable(id='report')
     ]),
     html.Br(),
     html.Div([
-        html.P("Ledger"),
+        html.P("Blotter: this table shows every single trading activities based on the chosen strategy"),
+        dash_table.DataTable(id='blotter')
+    ]),
+html.Br(),
+    html.Div([
+        html.P("Return: this table shows the overall daily return of the chosen strategy, assuming all the trading activities use same amount of capital"),
         dash_table.DataTable(id='ledger')
     ]),
 ])
@@ -51,6 +56,8 @@ app.layout = html.Div([
 @app.callback(
     [dependencies.Output('report', 'data'),
      dependencies.Output('report', 'columns'),
+     dependencies.Output('blotter', 'data'),
+     dependencies.Output('blotter', 'columns'),
      dependencies.Output('ledger', 'data'),
      dependencies.Output('ledger', 'columns')],
     dependencies.Input('submit-button', 'n_clicks'),
@@ -61,10 +68,16 @@ app.layout = html.Div([
 )
 def showReport(n_clicks, start, end, strategy):
     report = pd.DataFrame(None, columns=['Industry', 'Count', 'Win', 'Sum Period', 'Sum Company'])
-    ledger = pd.DataFrame(None, columns=['id', 'time', 'symbol', 'strategy', 'price', 'win'])
-    index = 1
-    start_time = int(parser.parse(start).timestamp())
-    end_time = int(parser.parse(end).timestamp())
+    blotter = None
+    ledger = None
+    if strategy == 'BUY':
+        blotter = pd.read_csv('../output/buy_blotter.csv')
+        ledger = pd.read_csv('../output/buy_ledger.csv')
+    elif strategy == 'SELL':
+        blotter = pd.read_csv('../output/sell_blotter.csv')
+        ledger = pd.read_csv('../output/sell_ledger.csv')
+    start_time = (pd.to_datetime(start) - dt.datetime(1970,1,1)).total_seconds()
+    end_time = (pd.to_datetime(end) - dt.datetime(1970,1,1)).total_seconds()
     tickers = getTickers()
     industries = tickers.Industry.unique()
     for industry in industries:
@@ -82,24 +95,6 @@ def showReport(n_clicks, start, end, strategy):
             active_list = ticker_info.loc[ticker_info['Long Signal'] == 'BUY']
             active_list = active_list.reset_index(drop=True)
             count = len(active_list)
-            for j in range(count):
-                operation = active_list.loc[j]
-                id = str(index) + "A"
-                time = operation['Time']
-                price = operation['Low']
-                win = True
-                period = operation['Long Period']
-                if period <= 0:
-                    win = False
-                ledger.loc[len(ledger.index)] = [id, time, symbol, "BUY", price, win]
-                id = str(index) + "B"
-                time = time + abs(period) * 86400
-                if win:
-                    price = price * win_ratio
-                else:
-                    price = price * loss_ratio
-                ledger.loc[len(ledger.index)] = [id, time, symbol, "Liquidation", price, win]
-                index = index + 1
             report.loc[report['Industry'] == industry, 'Count'] = report.loc[report['Industry'] == industry, 'Count'] + count
             win = len(ticker_info.loc[(ticker_info['Long Signal'] == 'BUY') & (ticker_info['Long Period'] > 0)])
             report.loc[report['Industry'] == industry, 'Win'] = report.loc[report['Industry'] == industry, 'Win'] + win
@@ -114,24 +109,6 @@ def showReport(n_clicks, start, end, strategy):
             report.loc[report['Industry'] == industry, 'Win'] = report.loc[report['Industry'] == industry, 'Win'] + win
             sum_p = sum(ticker_info.loc[(ticker_info['Short Signal'] == 'SELL') & (ticker_info['Short Period'] > 0), 'Short Period'])
             report.loc[report['Industry'] == industry, 'Sum Period'] = report.loc[report['Industry'] == industry, 'Sum Period'] + sum_p
-            for j in range(count):
-                operation = active_list.loc[j]
-                id = str(index) + "A"
-                time = operation['Time']
-                price = operation['Low']
-                win = True
-                period = operation['Short Period']
-                if period <= 0:
-                    win = False
-                ledger.loc[len(ledger.index)] = [id, time, symbol, "SELL", price, win]
-                id = str(index) + "B"
-                time = time + abs(period) * 86400
-                if win:
-                    price = price * loss_ratio
-                else:
-                    price = price * win_ratio
-                ledger.loc[len(ledger.index)] = [id, time, symbol, "Liquidation", price, win]
-                index = index + 1
     report = report.drop(report[report['Count'] == 0].index)
     report['Win Ratio'] = report['Win'] / report['Count']
     report['Ave Return Period'] = report['Sum Period'] / report['Win']
@@ -141,13 +118,16 @@ def showReport(n_clicks, start, end, strategy):
     report = report.sort_values(by=['Ave Return Period'])
     report_columns = [{"name": i, "id": i} for i in report.columns]
     report_data = report.to_dict('records')
-    ledger = ledger.sort_values(by=['time']).reset_index(drop=True)
-    ledger['date'] = pd.to_datetime(ledger['time'] * 1000000000).dt.date
-    ledger = ledger.drop(['time'], axis=1)
-    ledger = ledger.round({'price': 2})
+    blotter = blotter[(blotter['start_time'] > start_time) & (blotter['end_time'] < end_time)]
+    ledger = ledger[(ledger['Time'] > start_time) & (ledger['Time'] < end_time)]
+    blotter = blotter.drop(['start_time', 'end_time', 'Unnamed: 0'], axis=1)
+    blotter_columns = [{"name": i, "id": i} for i in blotter.columns]
+    blotter_data = blotter.to_dict('records')
+    ledger['Date'] = pd.to_datetime(ledger['Time'] * 1000000000).dt.date
+    ledger = ledger[['Date', 'PnL']]
     ledger_columns = [{"name": i, "id": i} for i in ledger.columns]
     ledger_data = ledger.to_dict('records')
-    return report_data, report_columns, ledger_data, ledger_columns
+    return report_data, report_columns, blotter_data, blotter_columns, ledger_data, ledger_columns
 
 
 if __name__ == '__main__':
