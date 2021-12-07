@@ -3,3 +3,4 @@ dash
 waitress
 pandas
 gitpython
+dash_daq
