@@ -1,0 +1,5 @@
+numpy
+dash
+waitress
+pandas
+gitpython
